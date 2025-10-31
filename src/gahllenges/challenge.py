@@ -15,14 +15,9 @@ def run(
     event: int, puzzle: int, config: ChallengeModel, input_pattern: str
 ) -> Generator[t.Result]:
     """Run code for one puzzle."""
-    # Locate code
+    # Locate and import code
     puzzle_dir = locate_puzzle(config, event, puzzle)
-    code_path = locate_code(config, puzzle_dir)
-    local_code_path = code_path.relative_to(config.challenge_dir)
-
-    # Import puzzle module
-    module_name = ".".join(local_code_path.parts).removesuffix(".py")
-    module = importlib.import_module(module_name)
+    module = import_solver(config, puzzle_dir)
 
     # Run functions
     for func_name, suffix in zip(
@@ -45,6 +40,16 @@ def run(
             )
 
 
+def import_solver(config: ChallengeModel, puzzle_dir: Path) -> ModuleType:
+    """Import the module solving a particular puzzle."""
+    code_path = locate_code(config, puzzle_dir)
+    local_code_path = code_path.relative_to(config.challenge_dir)
+
+    # Import puzzle module
+    module_name = ".".join(local_code_path.parts).removesuffix(".py")
+    return importlib.import_module(module_name)
+
+
 def get_input(
     config: ChallengeModel, module: ModuleType, puzzle_dir: Path, input_pattern: str
 ) -> Generator[t.Input]:
@@ -65,24 +70,23 @@ def get_input(
             )
 
 
+def _get_numeric_folders(base_dir: Path) -> dict[int, Path]:
+    """Find all folders starting with a numeric prefix."""
+    return {
+        int(folder_id): path
+        for path in sorted(base_dir.iterdir())
+        if (folder_id := path.name.split("_")[0]).isnumeric()
+    }
+
+
 def list_puzzles(config: ChallengeModel, event: int) -> dict[int, Path]:
     """List all puzzles in the given event."""
-    event_dir = locate_event(config, event)
-    return {
-        int(event_id): path
-        for path in event_dir.iterdir()
-        if (event_id := path.name.split("_")[0]).isnumeric()
-    }
+    return _get_numeric_folders(locate_event(config, event))
 
 
 def locate_event(config: ChallengeModel, event: int) -> Path:
     """Locate the folder for a given event."""
-    events = {
-        int(event_id): path
-        for path in config.challenge_dir.iterdir()
-        if (event_id := path.name.split("_")[0]).isnumeric()
-    }
-
+    events = _get_numeric_folders(config.challenge_dir)
     try:
         return events[event]
     except KeyError:

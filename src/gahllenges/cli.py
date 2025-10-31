@@ -1,5 +1,6 @@
 """Command line interface for the code runner."""
 
+import doctest
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -70,8 +71,28 @@ def configure_app(challenge_dir: Path, config_path: Path) -> App:
         overwrite: Annotated[bool, Parameter(name=["--overwrite", "-o"])] = False,
     ) -> None:
         """Run the solution to all puzzles in an event."""
-        for puzzle in sorted(challenge.list_puzzles(config, event)):
+        for puzzle in challenge.list_puzzles(config, event):
             run(event, puzzle, example=example, overwrite=overwrite)
+
+    @app.command
+    def test(
+        event: int,
+        puzzle: int | None = None,
+        *,
+        verbose: Annotated[bool, Parameter(name=["--verbose", "-v"])] = False,
+    ) -> None:
+        """Run doctests for one or all puzzles in an event."""
+        if puzzle is None:
+            for puzzle_id in challenge.list_puzzles(config, event):
+                test(event, puzzle=puzzle_id, verbose=verbose)
+        else:
+            puzzle_dir = challenge.locate_puzzle(config, event, puzzle)
+            module = challenge.import_solver(config, puzzle_dir)
+
+            path = Path(str(module.__file__)).relative_to(config.challenge_dir)
+            result = doctest.testmod(module, verbose=verbose, report=False)
+            score = f"{result.attempted-result.failed}/{result.attempted}"
+            stdout.print(f"[bold blue]{path} ({score})[/]")
 
     @app.command
     def gen(event: int, puzzle: int, name: str = "") -> None:
