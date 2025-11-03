@@ -15,7 +15,7 @@ def generate(config: ChallengeModel, event: int, puzzle: int, name: str) -> Path
     docstring = config.template.docstring.format(event=event, puzzle=puzzle, name=name)
     code = [f'"""{docstring}"""']
     if config.code.parse_function:
-        code.append(_parse_function(config, config.code.parse_function))
+        code.append(_parse_function(config.code.parse_function))
     code.extend(
         _solve_function(config, solve_function, part)
         for part, solve_function in enumerate(config.code.solve_functions, start=1)
@@ -24,7 +24,7 @@ def generate(config: ChallengeModel, event: int, puzzle: int, name: str) -> Path
     return out_path
 
 
-def _parse_function(config: ChallengeModel, name: str) -> str:
+def _parse_function(name: str) -> str:
     """Template for a parse function."""
     code = [
         f"def {name}(puzzle_input: str) -> list[str]:",

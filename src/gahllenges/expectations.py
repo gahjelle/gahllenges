@@ -41,7 +41,7 @@ def validate(
 
 def write_expectations(expectations_path: Path, results: list[t.Result]) -> None:
     """Update the expected results on disk."""
-    output = []
+    output: list[str] = []
     for result in results:
         output.extend(
             [
@@ -61,6 +61,7 @@ def write_expectations(expectations_path: Path, results: list[t.Result]) -> None
 
 def toml_dumps(value: str | int | float | None) -> str:  # noqa: PYI041
     """Write a simple value as a TOML value."""
+    # sourcery skip: assign-if-exp, reintroduce-else
     if isinstance(value, str):
         return f'"{value}"'
     if isinstance(value, int):

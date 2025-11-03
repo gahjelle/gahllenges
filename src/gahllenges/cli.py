@@ -16,6 +16,13 @@ if TYPE_CHECKING:
     from gahllenges.schemas import type_aliases as t
 
 stdout = Console()
+stderr = Console(stderr=True)
+
+
+def as_title(path: Path) -> str:
+    """Convert a numeric path to a title."""
+    _number, _, title = path.stem.partition("_")
+    return title.replace("_", " ").replace("-", " ").title()
 
 
 def get_config(challenge_dir: Path, config_path: Path) -> ChallengeModel:
@@ -26,13 +33,13 @@ def get_config(challenge_dir: Path, config_path: Path) -> ChallengeModel:
     ).convert_model(ChallengeModel)
 
 
-def configure_app(challenge_dir: Path, config_path: Path) -> App:
+def configure_app(challenge_dir: Path, config_path: Path) -> App:  # noqa: C901
     """Register CLI commands for the given coding challenge."""
     app = App()
     config = get_config(challenge_dir, config_path)
 
     @app.default
-    def run(
+    def run(  # pyright: ignore[reportUnusedFunction]
         event: int,
         puzzle: int,
         *,
@@ -44,38 +51,56 @@ def configure_app(challenge_dir: Path, config_path: Path) -> App:
 
         # Run challenge and show results
         results: list[t.Result] = []
-        for result in challenge.run(
-            event, puzzle, config=config, input_pattern=input_pattern
-        ):
-            results.append(result)
-            if result.value is None:
-                continue
-            stdout.print(
-                f"[green]{event:>4} {puzzle:>2} {result.name}[/] "
-                f"[grey50]({result.input.path.stem})[/] [blue]{result.value:>25}[/]"
-                f" [grey50]({1000 * result.duration:.2f}ms)[/]",
-                highlight=False,
-            )
+        try:
+            for result in challenge.run(
+                event, puzzle, config=config, input_pattern=input_pattern
+            ):
+                results.append(result)
+                if result.value is None:
+                    continue
+                stdout.print(
+                    f"[green]{event:>4} {puzzle:>2} {result.name}[/] "
+                    f"[grey50]{result.input.path.stem:<15}[/] [blue]{result.value:>25}[/]"
+                    f" [grey50]{1000 * result.duration:8.2f}ms[/]"
+                    + (
+                        f" [grey50](+ {1000 * result.input.duration:.2f}ms)[/]"
+                        if result.input.parse_function
+                        else ""
+                    ),
+                    highlight=False,
+                )
 
-            # Add result to the clipboard
-            pyperclip.copy(str(result.value))
+                # Add result to the clipboard
+                pyperclip.copy(str(result.value))
+        except Exception as err:
+            stderr.print(err)
 
         # Check results vs expected values
         expectations.validate(results, example=example, overwrite=overwrite)
 
     @app.command
-    def run_all(
-        event: int,
+    def run_all(  # pyright: ignore[reportUnusedFunction]
+        event: int | None = None,
         *,
         example: Annotated[bool, Parameter(name=["--example", "-e"])] = False,
         overwrite: Annotated[bool, Parameter(name=["--overwrite", "-o"])] = False,
     ) -> None:
         """Run the solution to all puzzles in an event."""
-        for puzzle in challenge.list_puzzles(config, event):
+        if event is None:
+            for single_event, path in challenge.list_events(config).items():
+                stdout.rule(f"{single_event} {as_title(path)}".strip())
+                run_all(single_event, example=example, overwrite=overwrite)
+            return
+
+        for puzzle, path in challenge.list_puzzles(config, event).items():
+            stdout.print(
+                f"[blue]{event:>4} {puzzle:>2} {as_title(path)}[/]",
+                highlight=False,
+            )
             run(event, puzzle, example=example, overwrite=overwrite)
 
     @app.command
-    def test(
+    def test(  # pyright: ignore[reportUnusedFunction]
         event: int,
         puzzle: int | None = None,
         *,
@@ -95,13 +120,13 @@ def configure_app(challenge_dir: Path, config_path: Path) -> App:
             stdout.print(f"[bold blue]{path} ({score})[/]")
 
     @app.command
-    def gen(event: int, puzzle: int, name: str = "") -> None:
+    def gen(event: int, puzzle: int, name: str = "") -> None:  # pyright: ignore[reportUnusedFunction]
         """Generate a solution template."""
         template.generate(config, event=event, puzzle=puzzle, name=name)
 
-    @app.command
     def show_config(section: str | None = None) -> None:
         """Show the configuration of the challenge."""
         configaroo.print_configuration(config, section=section)
 
+    app.command(show_config)
     return app

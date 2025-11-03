@@ -1,9 +1,11 @@
 """Handle one challenge and its puzzles."""
 
+import functools
 import importlib
 from collections.abc import Generator
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 from codetiming import Timer
 
@@ -19,6 +21,8 @@ def run(
     puzzle_dir = locate_puzzle(config, event, puzzle)
     module = import_solver(config, puzzle_dir)
 
+    suffixes = set(config.code.solve_functions)
+
     # Run functions
     for func_name, suffix in zip(
         config.code.solve_functions,
@@ -27,7 +31,11 @@ def run(
     ):
         func = getattr(module, func_name)
         for puzzle_input in get_input(
-            config, module, puzzle_dir, input_pattern.format(suffix=suffix)
+            config,
+            module,
+            puzzle_dir,
+            input_pattern=input_pattern.format(suffix=suffix),
+            bad_suffixes=suffixes - {func_name},
         ):
             with Timer(logger=None) as timer:
                 value = func(puzzle_input.value)
@@ -51,23 +59,41 @@ def import_solver(config: ChallengeModel, puzzle_dir: Path) -> ModuleType:
 
 
 def get_input(
-    config: ChallengeModel, module: ModuleType, puzzle_dir: Path, input_pattern: str
+    config: ChallengeModel,
+    module: ModuleType,
+    puzzle_dir: Path,
+    input_pattern: str,
+    bad_suffixes: set[str],
 ) -> Generator[t.Input]:
     """Read the input from a file."""
     for input_path in sorted(puzzle_dir.glob(input_pattern)):
+        if any(input_path.stem.endswith(suffix) for suffix in bad_suffixes):
+            continue
         puzzle_input = input_path.read_text().rstrip()
         if not config.code.parse_function:
             yield t.Input(value=puzzle_input, path=input_path)
         else:
-            parse = getattr(module, config.code.parse_function)
-            with Timer(logger=None) as timer:
-                value = parse(puzzle_input)
+            value, duration = parse_input(
+                puzzle_input, module, config.code.parse_function
+            )
             yield t.Input(
                 value=value,
                 path=input_path,
                 parse_function=config.code.parse_function,
-                duration=timer.last,
+                duration=duration,
             )
+
+
+@functools.cache
+def parse_input(
+    puzzle_input: str, module: ModuleType, parse_function: str
+) -> tuple[Any, float]:
+    """Parse the input and cache the result."""
+    parse = getattr(module, parse_function)
+    with Timer(logger=None) as timer:
+        value = parse(puzzle_input)
+
+    return value, timer.last
 
 
 def _get_numeric_folders(base_dir: Path) -> dict[int, Path]:
@@ -77,6 +103,11 @@ def _get_numeric_folders(base_dir: Path) -> dict[int, Path]:
         for path in sorted(base_dir.iterdir())
         if (folder_id := path.name.split("_")[0]).isnumeric()
     }
+
+
+def list_events(config: ChallengeModel) -> dict[int, Path]:
+    """List all events in the current challenge."""
+    return _get_numeric_folders(config.challenge_dir)
 
 
 def list_puzzles(config: ChallengeModel, event: int) -> dict[int, Path]:
