@@ -3,14 +3,29 @@
 from pathlib import Path
 
 from gahllenges import challenge
+from gahllenges.console import stderr
 from gahllenges.schemas.challenge import ChallengeModel
 
 
-def generate(config: ChallengeModel, event: int, puzzle: int, name: str) -> Path:
+def generate(
+    config: ChallengeModel,
+    *,
+    event: int,
+    puzzle: int,
+    name: str,
+    overwrite: bool = False,
+) -> Path:
     """Generate one puzzle file."""
     out_path = challenge.create_puzzle_dir(
         config=config, event=event, puzzle=puzzle, name=name
     ) / config.template.file_name.format(event=event, puzzle=puzzle)
+    if out_path.exists() and not overwrite:
+        stderr.print(
+            f"Code file already exists at [blue]{out_path.relative_to(Path.cwd())}[/]."
+            " Use [yellow]--overwrite[/] or [yellow]-o[/] to overwrite existing file.",
+            highlight=False,
+        )
+        raise SystemExit()
 
     docstring = config.template.docstring.format(event=event, puzzle=puzzle, name=name)
     code = [f'"""{docstring}"""']

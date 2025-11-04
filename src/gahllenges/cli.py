@@ -7,16 +7,13 @@ from typing import TYPE_CHECKING, Annotated
 import configaroo
 import pyperclip
 from cyclopts import App, Parameter
-from rich.console import Console
 
 from gahllenges import challenge, expectations, template
+from gahllenges.console import stderr, stdout
 from gahllenges.schemas.challenge import ChallengeModel
 
 if TYPE_CHECKING:
     from gahllenges.schemas import type_aliases as t
-
-stdout = Console()
-stderr = Console(stderr=True)
 
 
 def as_title(path: Path) -> str:
@@ -26,7 +23,7 @@ def as_title(path: Path) -> str:
 
 
 def get_config(challenge_dir: Path, config_path: Path) -> ChallengeModel:
-    """Read the configuration of the I18N challenge."""
+    """Read the configuration of the challenge."""
     return (
         configaroo.Configuration.from_file(config_path)
         | {"challenge_dir": challenge_dir}
@@ -59,8 +56,9 @@ def configure_app(challenge_dir: Path, config_path: Path) -> App:  # noqa: C901
                 if result.value is None:
                     continue
                 stdout.print(
-                    f"[green]{event:>4} {puzzle:>2} {result.name}[/] "
-                    f"[grey50]{result.input.path.stem:<15}[/] [blue]{result.value:>25}[/]"
+                    f"[green]{event:>4} {puzzle:>2} {result.name}[/]"
+                    f" [grey50]{result.input.path.stem:<15}[/]"
+                    f" [blue]{result.value:>25}[/]"
                     f" [grey50]{1000 * result.duration:8.2f}ms[/]"
                     + (
                         f" [grey50](+ {1000 * result.input.duration:.2f}ms)[/]"
@@ -72,7 +70,7 @@ def configure_app(challenge_dir: Path, config_path: Path) -> App:  # noqa: C901
 
                 # Add result to the clipboard
                 pyperclip.copy(str(result.value))
-        except Exception as err:
+        except Exception as err:  # noqa: BLE001
             stderr.print(err)
 
         # Check results vs expected values
@@ -120,9 +118,20 @@ def configure_app(challenge_dir: Path, config_path: Path) -> App:  # noqa: C901
             stdout.print(f"[bold blue]{path} ({score})[/]")
 
     @app.command
-    def gen(event: int, puzzle: int, name: str = "") -> None:  # pyright: ignore[reportUnusedFunction]
+    def gen(  # pyright: ignore[reportUnusedFunction]
+        event: int,
+        puzzle: int,
+        name: str = "",
+        *,
+        overwrite: Annotated[bool, Parameter(name=["--overwrite", "-o"])] = False,
+    ) -> None:
         """Generate a solution template."""
-        template.generate(config, event=event, puzzle=puzzle, name=name)
+        path = template.generate(
+            config, event=event, puzzle=puzzle, name=name, overwrite=overwrite
+        )
+        stdout.print(
+            f"Code for {name} generated at [blue]{path.relative_to(Path.cwd())}[/]"
+        )
 
     def show_config(section: str | None = None) -> None:
         """Show the configuration of the challenge."""
