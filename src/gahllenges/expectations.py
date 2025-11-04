@@ -19,13 +19,13 @@ def validate(
 
     toml_name = f"expected{'_example' if example else ''}.toml"
     puzzle_dir = results[0].puzzle_dir
-    expectations_path = puzzle_dir / toml_name
+    expected_path = puzzle_dir / toml_name
 
-    if not expectations_path.exists() or overwrite:
-        write_expectations(expectations_path, results)
+    if not expected_path.exists() or overwrite:
+        write_expectations(expected_path, results)
         return
 
-    expected = tomllib.loads(expectations_path.read_text(encoding="utf-8"))
+    expected = tomllib.load(expected_path.open(mode="rb"))
     for result in results:
         section = f"{result.name}-{result.input.path.stem}"
         expected_value = expected.get(section, {"value": None})["value"]
@@ -39,13 +39,36 @@ def validate(
             )
 
 
-def write_expectations(expectations_path: Path, results: list[t.Result]) -> None:
+def read_expectations(expected_path: Path) -> dict[str, t.Result]:
+    """Read the expected results from disk."""
+    expected = tomllib.load(expected_path.open(mode="rb"))
+    result: dict[str, t.Result] = {}
+    for section, values in expected.items():
+        name, *_ = section.partition("-")
+        result[name] = t.Result(
+            name=name,
+            puzzle_dir=expected_path.parent,
+            code=expected_path.parent / values["code"],
+            input=t.Input(
+                path=values["input_path"],
+                value=None,  # Don't include the input
+                parse_function="parse" if "parse_duration" in values else None,
+                duration=values.get("parse_duration", 0),
+            ),
+            value=values["value"],
+            duration=values["duration"],
+        )
+    return result
+
+
+def write_expectations(expected_path: Path, results: list[t.Result]) -> None:
     """Update the expected results on disk."""
     output: list[str] = []
     for result in results:
         output.extend(
             [
                 f"[{result.name}-{result.input.path.stem}]",
+                f"code = {toml_dumps(result.code.name)}",
                 f"input_path = {toml_dumps(result.input.path.name)}",
                 f"value = {toml_dumps(result.value)}",
                 f"duration = {toml_dumps(result.duration)}",
@@ -56,7 +79,7 @@ def write_expectations(expectations_path: Path, results: list[t.Result]) -> None
                 ),
             ]
         )
-    expectations_path.write_text("\n".join(output), encoding="utf-8")
+    expected_path.write_text("\n".join(output), encoding="utf-8")
 
 
 def toml_dumps(value: str | int | float | None) -> str:  # noqa: PYI041

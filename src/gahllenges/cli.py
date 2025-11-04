@@ -8,7 +8,7 @@ import configaroo
 import pyperclip
 from cyclopts import App, Parameter
 
-from gahllenges import challenge, expectations, template
+from gahllenges import challenge, expectations, readme, template
 from gahllenges.console import stderr, stdout
 from gahllenges.schemas.challenge import ChallengeModel
 
@@ -22,18 +22,19 @@ def as_title(path: Path) -> str:
     return title.replace("_", " ").replace("-", " ").title()
 
 
-def get_config(challenge_dir: Path, config_path: Path) -> ChallengeModel:
+def get_config(root_dir: Path, config_path: Path) -> ChallengeModel:
     """Read the configuration of the challenge."""
     return (
-        configaroo.Configuration.from_file(config_path)
-        | {"challenge_dir": challenge_dir}
-    ).convert_model(ChallengeModel)
+        (configaroo.Configuration.from_file(config_path) | {"root_dir": root_dir})
+        .parse_dynamic()
+        .convert_model(ChallengeModel)
+    )
 
 
-def configure_app(challenge_dir: Path, config_path: Path) -> App:  # noqa: C901
+def configure_app(root_dir: Path, config_path: Path) -> App:  # noqa: C901
     """Register CLI commands for the given coding challenge."""
     app = App()
-    config = get_config(challenge_dir, config_path)
+    config = get_config(root_dir, config_path)
 
     @app.default
     def run(  # pyright: ignore[reportUnusedFunction]
@@ -112,7 +113,7 @@ def configure_app(challenge_dir: Path, config_path: Path) -> App:  # noqa: C901
             puzzle_dir = challenge.locate_puzzle(config, event, puzzle)
             module = challenge.import_solver(config, puzzle_dir)
 
-            path = Path(str(module.__file__)).relative_to(config.challenge_dir)
+            path = Path(str(module.__file__)).relative_to(Path.cwd())
             result = doctest.testmod(module, verbose=verbose, report=False)
             score = f"{result.attempted-result.failed}/{result.attempted}"
             stdout.print(f"[bold blue]{path} ({score})[/]")
@@ -133,9 +134,14 @@ def configure_app(challenge_dir: Path, config_path: Path) -> App:  # noqa: C901
             f"Code for {name} generated at [blue]{path.relative_to(Path.cwd())}[/]"
         )
 
-    def show_config(section: str | None = None) -> None:
+    @app.command
+    def update_readme() -> None:  # pyright: ignore[reportUnusedFunction]
+        """Update README files."""
+        readme.update(config)
+
+    @app.command
+    def show_config(section: str | None = None) -> None:  # pyright: ignore[reportUnusedFunction]
         """Show the configuration of the challenge."""
         configaroo.print_configuration(config, section=section)
 
-    app.command(show_config)
     return app

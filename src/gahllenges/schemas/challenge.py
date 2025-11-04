@@ -2,9 +2,18 @@
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, HttpUrl
 
 from gahllenges.schemas import StrictModel
+from gahllenges.schemas import type_aliases as t
+
+
+class Challenge(StrictModel):
+    """Information about the challenge."""
+
+    name: str = Field(description="Name of the challenge")
+    url: HttpUrl = Field(description="Url to the main page of the challenge")
+    icon: str = Field(description="Icon representing one solution in the challenge")
 
 
 class Patterns(StrictModel):
@@ -36,11 +45,19 @@ class Template(StrictModel):
     docstring: str = Field(description="Docstring on top of file")
 
 
+class Language(StrictModel):
+    """Information about each programming language used for the challenge."""
+
+    icon: str
+    language_dir: Path
+
+
 class ChallengeModel(StrictModel):
     """Describe one challenge."""
 
-    name: str = Field(description="Name of challenge")
-    challenge_dir: Path = Field(description="The path to the challenge directory")
+    root_dir: Path = Field(description="The root path to the challenge directory")
+    challenge: Challenge
     patterns: Patterns
     code: Code
     template: Template
+    languages: dict[t.LanguageName, Language]

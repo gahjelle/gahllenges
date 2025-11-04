@@ -14,11 +14,14 @@ from gahllenges.schemas.challenge import ChallengeModel
 
 
 def run(
-    event: int, puzzle: int, config: ChallengeModel, input_pattern: str
+    event: int,
+    puzzle: int,
+    config: ChallengeModel,
+    input_pattern: str,
 ) -> Generator[t.Result]:
     """Run code for one puzzle."""
     # Locate and import code
-    puzzle_dir = locate_puzzle(config, event, puzzle)
+    puzzle_dir = locate_puzzle(config, event, puzzle, language="python")
     module = import_solver(config, puzzle_dir)
 
     suffixes = set(config.code.solve_functions)
@@ -41,6 +44,7 @@ def run(
                 value = func(puzzle_input.value)
             yield t.Result(
                 name=func_name,
+                code=Path(str(module.__file__)),
                 value=value,
                 puzzle_dir=puzzle_dir,
                 input=puzzle_input,
@@ -51,7 +55,7 @@ def run(
 def import_solver(config: ChallengeModel, puzzle_dir: Path) -> ModuleType:
     """Import the module solving a particular puzzle."""
     code_path = locate_code(config, puzzle_dir)
-    local_code_path = code_path.relative_to(config.challenge_dir)
+    local_code_path = code_path.relative_to(config.languages["python"].language_dir)
 
     # Import puzzle module
     module_name = ".".join(local_code_path.parts).removesuffix(".py")
@@ -105,19 +109,25 @@ def _get_numeric_folders(base_dir: Path) -> dict[int, Path]:
     }
 
 
-def list_events(config: ChallengeModel) -> dict[int, Path]:
+def list_events(
+    config: ChallengeModel, language: t.LanguageName = "python"
+) -> dict[int, Path]:
     """List all events in the current challenge."""
-    return _get_numeric_folders(config.challenge_dir)
+    return _get_numeric_folders(config.languages[language].language_dir)
 
 
-def list_puzzles(config: ChallengeModel, event: int) -> dict[int, Path]:
+def list_puzzles(
+    config: ChallengeModel, event: int, language: t.LanguageName = "python"
+) -> dict[int, Path]:
     """List all puzzles in the given event."""
-    return _get_numeric_folders(locate_event(config, event))
+    return _get_numeric_folders(locate_event(config, event, language=language))
 
 
-def locate_event(config: ChallengeModel, event: int) -> Path:
+def locate_event(
+    config: ChallengeModel, event: int, language: t.LanguageName = "python"
+) -> Path:
     """Locate the folder for a given event."""
-    events = _get_numeric_folders(config.challenge_dir)
+    events = _get_numeric_folders(config.languages[language].language_dir)
     try:
         return events[event]
     except KeyError:
@@ -125,9 +135,11 @@ def locate_event(config: ChallengeModel, event: int) -> Path:
         raise ValueError(msg) from None
 
 
-def locate_puzzle(config: ChallengeModel, event: int, puzzle: int) -> Path:
+def locate_puzzle(
+    config: ChallengeModel, event: int, puzzle: int, language: t.LanguageName = "python"
+) -> Path:
     """Locate the folder for a given puzzle."""
-    puzzles = list_puzzles(config, event)
+    puzzles = list_puzzles(config, event, language=language)
 
     try:
         return puzzles[puzzle]
@@ -147,11 +159,15 @@ def locate_code(config: ChallengeModel, puzzle_dir: Path, suffix: str = "") -> P
 
 
 def create_puzzle_dir(
-    config: ChallengeModel, event: int, puzzle: int, name: str
+    config: ChallengeModel,
+    event: int,
+    puzzle: int,
+    name: str,
+    language: t.LanguageName = "python",
 ) -> Path:
     """Create a folder for a puzzle."""
     puzzle_name = f"{puzzle:02d}" + (f"_{_normalize_name(name)}" if name else "")
-    puzzle_path = locate_event(config, event) / puzzle_name
+    puzzle_path = locate_event(config, event, language=language) / puzzle_name
     puzzle_path.mkdir(exist_ok=True, parents=True)
 
     return puzzle_path
