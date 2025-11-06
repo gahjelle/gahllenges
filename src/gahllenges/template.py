@@ -25,7 +25,7 @@ def generate(
             " Use [yellow]--overwrite[/] or [yellow]-o[/] to overwrite existing file.",
             highlight=False,
         )
-        raise SystemExit()
+        raise SystemExit
 
     docstring = config.template.docstring.format(event=event, puzzle=puzzle, name=name)
     code = [f'"""{docstring}"""']

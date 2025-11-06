@@ -1,14 +1,14 @@
 [build-system]
-requires = ["uv_build>=0.8.18,<0.9.0"]
+requires = ["uv_build>=0.9.7,<0.10.0"]
 build-backend = "uv_build"
 
 [project]
 name = "gahllenges"
 version = "0.1.0"
-description = "Work with coding challenges"
+description = "Framework for running coding challenges"
 readme = "README.md"
 authors = [{ name = "Geir Arne Hjelle", email = "geirarne@gmail.com" }]
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
     "codetiming>=1.4.0",
     "configaroo>=0.6.1",
@@ -30,7 +30,7 @@ dev = [
 
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py311"
 exclude = [".git", "venv", "migrations", "node_modules"]
 
 [tool.ruff.lint]
@@ -47,17 +47,15 @@ ignore = [
 # S101: Use of `assert` (OK for tests)
 # SLF001: Private member accessed (OK for tests)
 # UP018: Replace with string/integer/... literal (OK for typed tests)
-"examples/*/config.py" = ["D101"]
-"tests/schema.py" = ["D101"]
+"src/gahllenges/schemas/*.py" = ["D101"]
 "tests/test_*.py" = ["PLR2004", "S101", "SLF001", "UP018"]
-"tests/*/test_*.py" = ["S101"]
 
 
 [tool.pyright]
-pythonVersion = "3.12"
+pythonVersion = "3.11"
 typeCheckingMode = "strict"
 verboseOutput = false
-include = ["src/", "tests/", "examples/"]
+include = ["src/", "tests/"]
 venv = ".venv"
 
 
