@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from gahllenges import challenge
-from gahllenges.console import stderr
+from gahllenges.console import relative_to_cwd, stderr
 from gahllenges.schemas.challenge import ChallengeModel
 
 
@@ -21,7 +21,7 @@ def generate(
     ) / config.template.file_name.format(event=event, puzzle=puzzle)
     if out_path.exists() and not overwrite:
         stderr.print(
-            f"Code file already exists at [blue]{out_path.relative_to(Path.cwd())}[/]."
+            f"Code file already exists at [blue]{relative_to_cwd(out_path)}[/]."
             " Use [yellow]--overwrite[/] or [yellow]-o[/] to overwrite existing file.",
             highlight=False,
         )

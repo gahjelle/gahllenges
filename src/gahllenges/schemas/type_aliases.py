@@ -20,11 +20,13 @@ class Input(StrictModel):
 class Result(StrictModel):
     """Result after solving a puzzle."""
 
+    interpreter: str
     name: str
     puzzle_dir: Path
     code: Path
     input: Input
     value: int | str | None
+    solved: bool
     duration: float
 
 

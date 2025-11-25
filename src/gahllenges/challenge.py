@@ -2,11 +2,14 @@
 
 import functools
 import importlib
+import re
+import sys
 from collections.abc import Generator
 from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+import platformdirs
 from codetiming import Timer
 
 from gahllenges.schemas import type_aliases as t
@@ -43,21 +46,85 @@ def run(
             with Timer(logger=None) as timer:
                 value = func(puzzle_input.value)
             yield t.Result(
+                interpreter=sys.implementation.cache_tag,
                 name=func_name,
-                code=Path(str(module.__file__)),
-                value=value,
                 puzzle_dir=puzzle_dir,
+                code=Path(str(module.__file__)),
                 input=puzzle_input,
+                value=value,
+                solved=True,  # Assume the puzzle is solved
                 duration=timer.last,
             )
 
 
+def draw_viz(
+    event: int,
+    puzzle: int,
+    *,
+    config: ChallengeModel,
+    input_pattern: str,
+    overwrite: bool,
+) -> Generator[Path | None]:
+    """Draw visualizations for one puzzle."""
+    viz_dir = platformdirs.user_data_path(config.root_dir.name)
+    viz_dir.mkdir(parents=True, exist_ok=True)
+
+    # Locate and import code
+    puzzle_dir = locate_puzzle(config, event, puzzle, language="python")
+    module = import_viz(config, puzzle_dir)
+    if module is None:
+        return None
+
+    suffixes = set(config.code.solve_functions)
+
+    # Run functions
+    for func_name, suffix in zip(
+        config.code.solve_functions,
+        config.patterns.suffixes or [""] * len(config.code.solve_functions),
+        strict=True,
+    ):
+        viz_path = viz_dir / f"viz-{event}-{puzzle:02d}-{func_name}.png"
+        if viz_path.exists() and not overwrite:
+            yield viz_path
+            continue
+
+        try:
+            func = getattr(module, func_name)
+        except AttributeError:
+            continue
+        for puzzle_input in get_input(
+            config,
+            module,
+            puzzle_dir,
+            input_pattern=input_pattern.format(suffix=suffix),
+            bad_suffixes=suffixes - {func_name},
+        ):
+            func(puzzle_input.value, viz_path)
+            yield viz_path
+
+
 def import_solver(config: ChallengeModel, puzzle_dir: Path) -> ModuleType:
     """Import the module solving a particular puzzle."""
-    code_path = locate_code(config, puzzle_dir)
+    code_path = locate_code(config.patterns.solve.format(suffix=""), puzzle_dir)
     local_code_path = code_path.relative_to(config.languages["python"].language_dir)
 
     # Import puzzle module
+    module_name = ".".join(local_code_path.parts).removesuffix(".py")
+    return importlib.import_module(module_name)
+
+
+def import_viz(config: ChallengeModel, puzzle_dir: Path) -> ModuleType | None:
+    """Import the module visualizing a particular puzzle."""
+    if config.patterns.viz is None:
+        return None
+
+    try:
+        code_path = locate_code(config.patterns.viz, puzzle_dir)
+    except ValueError:
+        return None
+
+    # Import visualization module
+    local_code_path = code_path.relative_to(config.languages["python"].language_dir)
     module_name = ".".join(local_code_path.parts).removesuffix(".py")
     return importlib.import_module(module_name)
 
@@ -148,10 +215,9 @@ def locate_puzzle(
         raise ValueError(msg) from None
 
 
-def locate_code(config: ChallengeModel, puzzle_dir: Path, suffix: str = "") -> Path:
+def locate_code(code_pattern: str, puzzle_dir: Path) -> Path:
     """Locate the code file for a given puzzle."""
-    code_pattern = config.patterns.code.format(suffix=suffix)
-    for path in puzzle_dir.glob(code_pattern):
+    for path in sorted(puzzle_dir.glob(code_pattern)):
         return path
 
     msg = f"No code file {code_pattern} found in {puzzle_dir}"
@@ -175,4 +241,4 @@ def create_puzzle_dir(
 
 def _normalize_name(name: str) -> str:
     """Normalize a name for use in directory names."""
-    return name.lower().replace(" ", "-")
+    return re.sub(r"[^\w\d_-]", "", name.lower().replace(" ", "-"))

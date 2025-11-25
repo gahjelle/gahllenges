@@ -46,6 +46,7 @@ def read_expectations(expected_path: Path) -> dict[str, t.Result]:
     for section, values in expected.items():
         name, *_ = section.partition("-")
         result[name] = t.Result(
+            interpreter=values["interpreter"],
             name=name,
             puzzle_dir=expected_path.parent,
             code=expected_path.parent / values["code"],
@@ -56,6 +57,7 @@ def read_expectations(expected_path: Path) -> dict[str, t.Result]:
                 duration=values.get("parse_duration", 0),
             ),
             value=values["value"],
+            solved=values["solved"],
             duration=values["duration"],
         )
     return result
@@ -68,9 +70,11 @@ def write_expectations(expected_path: Path, results: list[t.Result]) -> None:
         output.extend(
             [
                 f"[{result.name}-{result.input.path.stem}]",
+                f"interpreter = {toml_dumps(result.interpreter)}",
                 f"code = {toml_dumps(result.code.name)}",
                 f"input_path = {toml_dumps(result.input.path.name)}",
                 f"value = {toml_dumps(result.value)}",
+                f"solved = {toml_dumps(result.solved)}",
                 f"duration = {toml_dumps(result.duration)}",
                 (
                     f"parse_duration = {toml_dumps(result.input.duration)}\n"
@@ -82,9 +86,11 @@ def write_expectations(expected_path: Path, results: list[t.Result]) -> None:
     expected_path.write_text("\n".join(output), encoding="utf-8")
 
 
-def toml_dumps(value: str | int | float | None) -> str:  # noqa: PYI041
+def toml_dumps(value: bool | str | int | float | None) -> str:  # noqa: FBT001, PYI041
     """Write a simple value as a TOML value."""
     # sourcery skip: assign-if-exp, reintroduce-else
+    if isinstance(value, bool):
+        return "true" if value else "false"
     if isinstance(value, str):
         return f'"{value}"'
     if isinstance(value, int):

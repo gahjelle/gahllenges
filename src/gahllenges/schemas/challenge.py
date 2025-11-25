@@ -19,7 +19,8 @@ class Challenge(StrictModel):
 class Patterns(StrictModel):
     """File patterns used in the challenge."""
 
-    code: str = Field(description="Pattern identifying code files")
+    solve: str = Field(description="Pattern identifying solve (code) files")
+    viz: str | None = Field(None, description="Pattern identifying visualization files")
     input: str = Field(description="Pattern identifying input files")
     example: str = Field(description="Pattern identifying example files")
     suffixes: list[str] = Field(
@@ -38,11 +39,25 @@ class Code(StrictModel):
     )
 
 
+class ReadmeTemplate(StrictModel):
+    """Templates for generating README files."""
+
+    challenge: Path = Field(description="Path to template for the main challenge file")
+    language: Path = Field(description="Path to template for the language overview")
+    event: Path | None = Field(
+        None, description="Path to template for the event overview"
+    )
+    puzzle: Path | None = Field(
+        None, description="Path to template for individual puzzles"
+    )
+
+
 class Template(StrictModel):
     """Template for generating code."""
 
     file_name: str = Field(description="Name of code file")
     docstring: str = Field(description="Docstring on top of file")
+    readme: ReadmeTemplate
 
 
 class Language(StrictModel):
